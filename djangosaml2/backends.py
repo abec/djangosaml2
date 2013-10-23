@@ -28,7 +28,7 @@ logger = logging.getLogger('djangosaml2')
 class Saml2Backend(ModelBackend):
 
     def authenticate(self, session_info=None, attribute_mapping=None,
-                     create_unknown_user=True):
+                     create_unknown_user=True, username_source='attributes'):
         if session_info is None or attribute_mapping is None:
             logger.error('Session info or attribute mapping are None')
             return None
@@ -45,17 +45,27 @@ class Saml2Backend(ModelBackend):
             settings, 'SAML_DJANGO_USER_MAIN_ATTRIBUTE', 'username')
 
         logger.debug('attributes: %s' % attributes)
-        logger.debug('attribute_mapping: %s' % attribute_mapping)
+
         saml_user = None
-        for saml_attr, django_fields in attribute_mapping.items():
-            if (django_user_main_attribute in django_fields
-                and saml_attr in attributes):
-                saml_user = attributes[saml_attr][0]
+        if username_source == 'attributes':
+            logger.debug('attribute_mapping: %s' % attribute_mapping)
+            for saml_attr, django_fields in attribute_mapping.items():
+                if (django_user_main_attribute in django_fields
+                    and saml_attr in attributes):
+                    saml_user = attributes[saml_attr][0]
+
+        elif username_source == 'nameid':
+            if 'name_id' in session_info:
+                logger.debug('name_id: %s' % session_info['name_id'])
+                saml_user = session_info['name_id'].text
+            else:
+                logger.error('The nameid is not available. Cannot find user without a nameid.')
 
         if saml_user is None:
             logger.error('Could not find saml_user value')
             return None
 
+        # @TODO(abe): Change this to include nameid support.
         if not self.is_authorized(attributes, attribute_mapping):
             return None
 

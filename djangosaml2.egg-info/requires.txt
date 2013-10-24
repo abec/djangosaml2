@@ -1,2 +1,0 @@
-pysaml2
-python-memcached
